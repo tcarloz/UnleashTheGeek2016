@@ -36,7 +36,9 @@ class vector_pod(object):
     def dist(self, other):
         return (other - self).norm()
 
-    def next_speed(self, thrust):
+    def next_speed(self, thrust, it=1):
+        if it>1 :
+            return (self*((self.norm()+thrust)*.9/self.norm())).next_speed(thrust,it-1)
         return self*((self.norm()+thrust)*.9/self.norm())
 
 
@@ -111,20 +113,31 @@ enemy_pods = [pod (), pod ()]
 our_camp = vector_pod()
 turn_number = 1
 
+def format_result(x,y,speed):
+    resx = abs(x) if x< 10000 else abs(20000-x)
+    resy = abs(y) if y< 8000 else abs(16000-y)
+    if resx!=x or resy!=y :
+        print >>  sys.stderr , 'old input      {} {} {}'.format(x,y,speed)
+        print >>  sys.stderr , 'adjusted input {} {} {}'.format(resx,resy,speed)
+        #todo put speed
+    return '{} {} {}'.format(x,resy,speed)
 
 class strategy_def(object):
     def compute(self, pod):
-        need_to_boost = False
+        need_to_boost = our_flag.pod
         if not our_flag.pod:
             best_pod = min(enemy_pods, key=lambda x: (x.pos+x.velocity).dist(our_flag.pos))
             tmp_pos = (best_pod.pos + our_flag.pos)*0.5
-            return "{} {} {}".format(tmp_pos.x, tmp_pos.y , 100)
+            return format_result(tmp_pos.x, tmp_pos.y , 100)
         else:
             futur_enemy_pos = our_flag.pod.next_turn()
             futur_self_pos = pod.next_turn()
+            current_distance = our_flag.pos.dist(pod.pos)
             if (futur_enemy_pos.dist(futur_self_pos) > 900 and futur_enemy_pos.dist(futur_self_pos) < 1300):
                 need_to_boost = True
-            return "{} {} {}".format(our_flag.true_pos.x+our_flag.true_velo.next_speed(100).x, our_flag.true_pos.y+our_flag.true_velo.next_speed(100).y , "BOOST" if need_to_boost else 100)
+            it = 1
+            it = 1+ int(futur_enemy_pos.dist(futur_self_pos)/2500)
+            return format_result(our_flag.true_pos.x+our_flag.true_velo.next_speed(100,it).x , our_flag.true_pos.y+our_flag.true_velo.next_speed(100,it).y , "BOOST" if need_to_boost else 100)
 
 
 class strategy_atk(object):
@@ -136,9 +149,9 @@ class strategy_atk(object):
             futur_self_pos = pod.next_turn()
             if (futur_enemy_pos.dist(futur_self_pos) < 900):
                 need_to_boost = True
-            return "{} {} {}".format(pod.pos.x+pod.velocity.x, pod.pos.y, "BOOST" if need_to_boost else 100)
+            return format_result(pod.pos.x+pod.velocity.x, pod.pos.y, 100)
         else:
-            return "{} {} {}".format(enemy_flag.true_pos.x, enemy_flag.true_pos.y ,"100")
+            return format_result(enemy_flag.true_pos.x - pod.velocity.x, enemy_flag.true_pos.y - pod.velocity.y ,"BOOST")
 
 
 def full_print():
@@ -171,7 +184,7 @@ while True:
     if enemy_flag.pod:
         enemy_flag.pod.strategy=strategy_atk()
     else:
-        best_pod = max(our_pods, key=lambda x: x.pos.dist(our_flag.true_pos+our_flag.true_velo))
+        best_pod = max(our_pods, key=lambda x: (x.pos+x.velocity).dist(our_flag.true_pos+our_flag.true_velo))
         print >> sys.stderr, best_pod
         best_pod.strategy=strategy_atk()
 
